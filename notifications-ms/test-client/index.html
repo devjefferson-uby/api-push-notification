@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Firebase Web Push Test Client</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding-top: 50px; }
+    #status { font-weight: bold; margin-bottom: 20px; }
+    #token-container { display: none; }
+    textarea { width: 80%; min-height: 100px; margin-top: 10px; padding: 10px; font-family: monospace; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <h1>Cliente de Teste para Firebase Push</h1>
+  <p id="status">Aguardando inicialização do Firebase...</p>
+  <button id="request-permission-btn" style="display: none;">Solicitar Permissão de Notificação</button>
+
+  <div id="token-container">
+    <h2>Seu Token FCM:</h2>
+    <p>Copie este token e use-o no corpo da requisição para `POST /push/test`</p>
+    <textarea id="fcm-token" readonly></textarea>
+  </div>
+
+  <!-- Importar os SDKs do Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js"></script>
+
+  <script>
+    // --- COLE A CONFIGURAÇÃO DO SEU FIREBASE WEB APP AQUI ---
+    const firebaseConfig = {
+      apiKey: "AIza...",
+      authDomain: "seu-projeto.firebaseapp.com",
+      projectId: "seu-projeto-id",
+      storageBucket: "seu-projeto.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef123456"
+    };
+    // ---------------------------------------------------------
+
+    // Inicializar o Firebase
+    firebase.initializeApp(firebaseConfig);
+    const messaging = firebase.messaging();
+    const statusEl = document.getElementById('status');
+    const permissionBtn = document.getElementById('request-permission-btn');
+    const tokenContainer = document.getElementById('token-container');
+    const tokenEl = document.getElementById('fcm-token');
+
+    statusEl.textContent = 'Firebase inicializado. Verificando permissão...';
+
+    // Verificar se o navegador suporta notificações
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        statusEl.textContent = 'Permissão já concedida. Solicitando token...';
+        requestToken();
+      } else if (Notification.permission === 'denied') {
+        statusEl.textContent = 'Permissão de notificação foi bloqueada. Habilite nas configurações do seu navegador.';
+      } else {
+        statusEl.textContent = 'Permissão de notificação necessária.';
+        permissionBtn.style.display = 'block';
+      }
+    } else {
+      statusEl.textContent = 'Este navegador não suporta notificações.';
+    }
+
+    permissionBtn.addEventListener('click', () => {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          statusEl.textContent = 'Permissão concedida! Solicitando token...';
+          permissionBtn.style.display = 'none';
+          requestToken();
+        } else {
+          statusEl.textContent = 'Permissão não concedida.';
+        }
+      });
+    });
+
+    function requestToken() {
+      // Para obter o token, o Firebase precisa de um "Service Worker".
+      // O firebase-messaging-sw.js é o arquivo que fará isso.
+      messaging.getToken({ vapidKey: 'COLOQUE_SUA_VAPID_KEY_AQUI' }) // Você encontrará essa chave no Console do Firebase
+        .then((currentToken) => {
+          if (currentToken) {
+            statusEl.textContent = 'Token obtido com sucesso!';
+            tokenContainer.style.display = 'block';
+            tokenEl.value = currentToken;
+          } else {
+            statusEl.textContent = 'Não foi possível obter o token. Verifique se o service worker está configurado corretamente.';
+          }
+        }).catch((err) => {
+          statusEl.textContent = 'Ocorreu um erro ao obter o token.';
+          console.error('An error occurred while retrieving token. ', err);
+        });
+    }
+
+    // Lida com mensagens recebidas enquanto a página está em primeiro plano
+    messaging.onMessage((payload) => {
+        console.log('Mensagem recebida em primeiro plano: ', payload);
+        // Opcional: exibir uma notificação customizada
+        const notificationTitle = payload.notification.title;
+        const notificationOptions = {
+            body: payload.notification.body,
+            icon: '/firebase-logo.png' // Opcional
+        };
+        new Notification(notificationTitle, notificationOptions);
+    });
+
+  </script>
+
+</body>
+</html>
